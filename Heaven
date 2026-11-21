@@ -1,0 +1,647 @@
+--[[
+    FAMILY HUD - iOS Edition (Fixed)
+    by Heaven / Family Hud
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- // CONFIGURACIÓN Y ESTADOS //
+local Config = {
+    CamLockEnabled = false,
+    FOVRadius = 120,
+    ShowFOV = true,
+    RainbowFOV = true,
+    RainbowUI = true,
+    Smoothness = 0.25,
+    TargetPart = "HumanoidRootPart",
+
+    ESPEnabled = false,
+    ESPShowRoles = true,
+
+    SelectedSkybox = "Default",
+    FPSBoostEnabled = false
+}
+
+-- // LIMPIAR INSTANCIAS PREVIAS //
+if game.CoreGui:FindFirstChild("FamilyHudUI") then
+    game.CoreGui:FindFirstChild("FamilyHudUI"):Destroy()
+end
+if game.CoreGui:FindFirstChild("FamilyHudESPFolder") then
+    game.CoreGui:FindFirstChild("FamilyHudESPFolder"):Destroy()
+end
+
+local ESPFolder = Instance.new("Folder")
+ESPFolder.Name = "FamilyHudESPFolder"
+ESPFolder.Parent = game.CoreGui
+
+-- // CREACIÓN DE LA INTERFAZ (iOS STYLE) //
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "FamilyHudUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = game.CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 326, 0, 465)
+MainFrame.Position = UDim2.new(0.5, -163, 0.5, -232)
+MainFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 24)
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(255, 255, 255)
+MainStroke.Thickness = 2
+MainStroke.Parent = MainFrame
+
+local Header = Instance.new("Frame")
+Header.Name = "Header"
+Header.Size = UDim2.new(1, 0, 0, 50)
+Header.BackgroundTransparency = 1
+Header.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Text = "Family Hud"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 20
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(0.65, 0, 1, 0)
+Title.Position = UDim2.new(0.06, 0, 0, 0)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Header
+
+local MinBtn = Instance.new("TextButton")
+MinBtn.Text = "—"
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextSize = 16
+MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinBtn.BackgroundColor3 = Color3.fromRGB(44, 44, 46)
+MinBtn.Size = UDim2.new(0, 30, 0, 30)
+MinBtn.Position = UDim2.new(1, -45, 0.5, -15)
+MinBtn.Parent = Header
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(1, 0)
+
+-- Barrita Larga Estilo iPhone al minimizar
+local iPhoneBar = Instance.new("TextButton")
+iPhoneBar.Name = "iPhoneBar"
+iPhoneBar.Text = ""
+iPhoneBar.Size = UDim2.new(0, 230, 0, 14)
+iPhoneBar.Position = UDim2.new(0.5, -115, 0.03, 0)
+iPhoneBar.BackgroundColor3 = Color3.fromRGB(242, 242, 247)
+iPhoneBar.Visible = false
+iPhoneBar.AutoButtonColor = false
+iPhoneBar.Parent = ScreenGui
+Instance.new("UICorner", iPhoneBar).CornerRadius = UDim.new(1, 0)
+
+local BarStroke = Instance.new("UIStroke")
+BarStroke.Color = Color3.fromRGB(255, 255, 255)
+BarStroke.Thickness = 1.5
+BarStroke.Parent = iPhoneBar
+
+local ScrollContainer = Instance.new("ScrollingFrame")
+ScrollContainer.Size = UDim2.new(1, -24, 1, -64)
+ScrollContainer.Position = UDim2.new(0, 12, 0, 54)
+ScrollContainer.BackgroundTransparency = 1
+ScrollContainer.ScrollBarThickness = 2
+ScrollContainer.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 105)
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 720)
+ScrollContainer.Parent = MainFrame
+
+local UIList = Instance.new("UIListLayout")
+UIList.Padding = UDim.new(0, 9)
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+UIList.Parent = ScrollContainer
+
+-- // ARRASTRAR //
+local function MakeDraggable(guiObject)
+    local dragging, dragInput, dragStart, startPos
+    guiObject.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = guiObject.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    guiObject.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            guiObject.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+MakeDraggable(MainFrame)
+MakeDraggable(iPhoneBar)
+
+-- // MINIMIZAR / RESTAURAR (con umbral para no abrir al arrastrar la barra) //
+local barMoved = false
+iPhoneBar.InputBegan:Connect(function()
+    barMoved = false
+end)
+iPhoneBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        barMoved = true
+    end
+end)
+
+MinBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    iPhoneBar.Visible = true
+end)
+
+iPhoneBar.MouseButton1Click:Connect(function()
+    if not barMoved then
+        iPhoneBar.Visible = false
+        MainFrame.Visible = true
+    end
+end)
+
+-- // CONSTRUCTORES UI iOS //
+local function AddCategory(name, order)
+    local CatLabel = Instance.new("TextLabel")
+    CatLabel.Text = string.upper(name)
+    CatLabel.Font = Enum.Font.GothamSemibold
+    CatLabel.TextSize = 12
+    CatLabel.TextColor3 = Color3.fromRGB(142, 142, 147)
+    CatLabel.BackgroundTransparency = 1
+    CatLabel.Size = UDim2.new(1, 0, 0, 20)
+    CatLabel.TextXAlignment = Enum.TextXAlignment.Left
+    CatLabel.LayoutOrder = order
+    CatLabel.Parent = ScrollContainer
+end
+
+local function AddiOSToggle(text, defaultState, order, callback)
+    local Row = Instance.new("Frame")
+    Row.Size = UDim2.new(1, 0, 0, 46)
+    Row.BackgroundColor3 = Color3.fromRGB(44, 44, 46)
+    Row.LayoutOrder = order
+    Row.Parent = ScrollContainer
+    Instance.new("UICorner", Row).CornerRadius = UDim.new(0, 12)
+
+    local RowStroke = Instance.new("UIStroke")
+    RowStroke.Color = Color3.fromRGB(255, 255, 255)
+    RowStroke.Thickness = 1
+    RowStroke.Transparency = 0.65
+    RowStroke.Parent = Row
+
+    local Label = Instance.new("TextLabel")
+    Label.Text = text
+    Label.Font = Enum.Font.GothamMedium
+    Label.TextSize = 14
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.BackgroundTransparency = 1
+    Label.Size = UDim2.new(0.72, 0, 1, 0)
+    Label.Position = UDim2.new(0.05, 0, 0, 0)
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Row
+
+    local SwitchBg = Instance.new("TextButton")
+    SwitchBg.Text = ""
+    SwitchBg.Size = UDim2.new(0, 50, 0, 28)
+    SwitchBg.Position = UDim2.new(1, -62, 0.5, -14)
+    SwitchBg.BackgroundColor3 = defaultState and Color3.fromRGB(52, 199, 89) or Color3.fromRGB(58, 58, 60)
+    SwitchBg.AutoButtonColor = false
+    SwitchBg.Parent = Row
+    Instance.new("UICorner", SwitchBg).CornerRadius = UDim.new(1, 0)
+
+    local Knob = Instance.new("Frame")
+    Knob.Size = UDim2.new(0, 24, 0, 24)
+    Knob.Position = defaultState and UDim2.new(1, -26, 0.5, -12) or UDim2.new(0, 2, 0.5, -12)
+    Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Knob.Parent = SwitchBg
+    Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
+
+    local state = defaultState
+    SwitchBg.MouseButton1Click:Connect(function()
+        state = not state
+        local targetColor = state and Color3.fromRGB(52, 199, 89) or Color3.fromRGB(58, 58, 60)
+        local targetPos = state and UDim2.new(1, -26, 0.5, -12) or UDim2.new(0, 2, 0.5, -12)
+        TweenService:Create(SwitchBg, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
+        TweenService:Create(Knob, TweenInfo.new(0.2), {Position = targetPos}):Play()
+        callback(state)
+    end)
+
+    return RowStroke
+end
+
+local function AddFOVControl(order)
+    local Row = Instance.new("Frame")
+    Row.Size = UDim2.new(1, 0, 0, 46)
+    Row.BackgroundColor3 = Color3.fromRGB(44, 44, 46)
+    Row.LayoutOrder = order
+    Row.Parent = ScrollContainer
+    Instance.new("UICorner", Row).CornerRadius = UDim.new(0, 12)
+
+    local RowStroke = Instance.new("UIStroke")
+    RowStroke.Color = Color3.fromRGB(255, 255, 255)
+    RowStroke.Thickness = 1
+    RowStroke.Transparency = 0.65
+    RowStroke.Parent = Row
+
+    local Label = Instance.new("TextLabel")
+    Label.Text = "Tamaño FOV: " .. Config.FOVRadius
+    Label.Font = Enum.Font.GothamMedium
+    Label.TextSize = 14
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.BackgroundTransparency = 1
+    Label.Size = UDim2.new(0.55, 0, 1, 0)
+    Label.Position = UDim2.new(0.05, 0, 0, 0)
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Row
+
+    local MinusBtn = Instance.new("TextButton")
+    MinusBtn.Text = "-"
+    MinusBtn.Font = Enum.Font.GothamBold
+    MinusBtn.TextSize = 18
+    MinusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MinusBtn.BackgroundColor3 = Color3.fromRGB(58, 58, 60)
+    MinusBtn.Size = UDim2.new(0, 32, 0, 30)
+    MinusBtn.Position = UDim2.new(1, -82, 0.5, -15)
+    MinusBtn.Parent = Row
+    Instance.new("UICorner", MinusBtn).CornerRadius = UDim.new(0, 8)
+
+    local PlusBtn = Instance.new("TextButton")
+    PlusBtn.Text = "+"
+    PlusBtn.Font = Enum.Font.GothamBold
+    PlusBtn.TextSize = 18
+    PlusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    PlusBtn.BackgroundColor3 = Color3.fromRGB(58, 58, 60)
+    PlusBtn.Size = UDim2.new(0, 32, 0, 30)
+    PlusBtn.Position = UDim2.new(1, -42, 0.5, -15)
+    PlusBtn.Parent = Row
+    Instance.new("UICorner", PlusBtn).CornerRadius = UDim.new(0, 8)
+
+    MinusBtn.MouseButton1Click:Connect(function()
+        Config.FOVRadius = math.max(30, Config.FOVRadius - 15)
+        Label.Text = "Tamaño FOV: " .. Config.FOVRadius
+    end)
+
+    PlusBtn.MouseButton1Click:Connect(function()
+        Config.FOVRadius = math.min(400, Config.FOVRadius + 15)
+        Label.Text = "Tamaño FOV: " .. Config.FOVRadius
+    end)
+
+    return RowStroke
+end
+
+-- // SKYBOX (EXTRAS) //
+-- Puedes reemplazar los AssetId por los tuyos cuando tengas conexión
+local SkyPresets = {
+    {
+        Name = "Default",
+        AssetId = "",
+        Ambient = Lighting.Ambient,
+        Outdoor = Lighting.OutdoorAmbient,
+        Sun = true
+    },
+    {
+        Name = "Sunset",
+        AssetId = "", -- Ej: "rbxassetid://123456789"
+        Ambient = Color3.fromRGB(160, 95, 85),
+        Outdoor = Color3.fromRGB(220, 120, 75),
+        Sun = true
+    },
+    {
+        Name = "Midnight",
+        AssetId = "",
+        Ambient = Color3.fromRGB(25, 32, 65),
+        Outdoor = Color3.fromRGB(18, 24, 52),
+        Sun = false
+    },
+    {
+        Name = "Neon Void",
+        AssetId = "",
+        Ambient = Color3.fromRGB(90, 25, 115),
+        Outdoor = Color3.fromRGB(130, 25, 135),
+        Sun = false
+    }
+}
+
+local OriginalSky = Lighting:FindFirstChildOfClass("Sky")
+local CustomSky = Instance.new("Sky")
+CustomSky.Name = "FamilyHud_CustomSky"
+
+local function ApplySkybox(preset)
+    Config.SelectedSkybox = preset.Name
+    if preset.Name == "Default" then
+        CustomSky.Parent = nil
+        if OriginalSky then OriginalSky.Parent = Lighting end
+        return
+    end
+
+    if OriginalSky then OriginalSky.Parent = nil end
+    CustomSky.Parent = Lighting
+    CustomSky.CelestialBodiesShown = preset.Sun
+
+    if preset.AssetId ~= "" then
+        CustomSky.SkyboxBk = preset.AssetId
+        CustomSky.SkyboxDn = preset.AssetId
+        CustomSky.SkyboxFt = preset.AssetId
+        CustomSky.SkyboxLf = preset.AssetId
+        CustomSky.SkyboxRt = preset.AssetId
+        CustomSky.SkyboxUp = preset.AssetId
+    end
+
+    Lighting.Ambient = preset.Ambient
+    Lighting.OutdoorAmbient = preset.Outdoor
+end
+
+local function AddSkyboxSelector(order)
+    local Box = Instance.new("Frame")
+    Box.Size = UDim2.new(1, 0, 0, 86)
+    Box.BackgroundColor3 = Color3.fromRGB(44, 44, 46)
+    Box.LayoutOrder = order
+    Box.Parent = ScrollContainer
+    Instance.new("UICorner", Box).CornerRadius = UDim.new(0, 12)
+
+    local BoxStroke = Instance.new("UIStroke")
+    BoxStroke.Color = Color3.fromRGB(255, 255, 255)
+    BoxStroke.Thickness = 1
+    BoxStroke.Transparency = 0.65
+    BoxStroke.Parent = Box
+
+    local Label = Instance.new("TextLabel")
+    Label.Text = "Skybox (Cielo): " .. Config.SelectedSkybox
+    Label.Font = Enum.Font.GothamMedium
+    Label.TextSize = 14
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.BackgroundTransparency = 1
+    Label.Size = UDim2.new(1, -20, 0, 26)
+    Label.Position = UDim2.new(0, 12, 0, 6)
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Box
+
+    local BtnHolder = Instance.new("Frame")
+    BtnHolder.Size = UDim2.new(1, -16, 0, 36)
+    BtnHolder.Position = UDim2.new(0, 8, 0, 38)
+    BtnHolder.BackgroundTransparency = 1
+    BtnHolder.Parent = Box
+
+    local Grid = Instance.new("UIGridLayout")
+    Grid.CellSize = UDim2.new(0.235, 0, 1, 0)
+    Grid.CellPadding = UDim2.new(0.02, 0, 0, 0)
+    Grid.Parent = BtnHolder
+
+    local buttons = {}
+    for _, preset in ipairs(SkyPresets) do
+        local btn = Instance.new("TextButton")
+        btn.Text = preset.Name
+        btn.Font = Enum.Font.GothamSemibold
+        btn.TextSize = 11
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.BackgroundColor3 = (preset.Name == Config.SelectedSkybox) and Color3.fromRGB(0, 122, 255) or Color3.fromRGB(64, 64, 68)
+        btn.Parent = BtnHolder
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+        buttons[preset.Name] = btn
+
+        btn.MouseButton1Click:Connect(function()
+            ApplySkybox(preset)
+            Label.Text = "Skybox (Cielo): " .. preset.Name
+            for k, b in pairs(buttons) do
+                b.BackgroundColor3 = (k == preset.Name) and Color3.fromRGB(0, 122, 255) or Color3.fromRGB(64, 64, 68)
+            end
+        end)
+    end
+
+    return BoxStroke
+end
+
+-- // FPS BOOST COMPACTO BY HEAVEN //
+local function ApplyFPSBoostByHeaven(enabled)
+    Config.FPSBoostEnabled = enabled
+    if not enabled then return end
+
+    pcall(function()
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 100000
+    end)
+
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+        elseif v:IsA("Decal") or v:IsA("Texture") then
+            v:Destroy()
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") then
+            v.Enabled = false
+        end
+    end
+end
+
+-- // POBLAR CATEGORÍAS //
+local StrokesToRainbow = {MainStroke, BarStroke}
+
+AddCategory("Killa FOV & Cámara", 1)
+table.insert(StrokesToRainbow, AddiOSToggle("Killa CamLock (Torso)", Config.CamLockEnabled, 2, function(v) Config.CamLockEnabled = v end))
+table.insert(StrokesToRainbow, AddiOSToggle("Mostrar Círculo FOV", Config.ShowFOV, 3, function(v) Config.ShowFOV = v end))
+table.insert(StrokesToRainbow, AddiOSToggle("FOV Rainbow", Config.RainbowFOV, 4, function(v) Config.RainbowFOV = v end))
+table.insert(StrokesToRainbow, AddFOVControl(5))
+
+AddCategory("Visuales & Murder Mystery", 6)
+table.insert(StrokesToRainbow, AddiOSToggle("Activar ESP Jugadores", Config.ESPEnabled, 7, function(v) Config.ESPEnabled = v end))
+table.insert(StrokesToRainbow, AddiOSToggle("Detectar Knife / Gun", Config.ESPShowRoles, 8, function(v) Config.ESPShowRoles = v end))
+
+AddCategory("Extras", 9)
+table.insert(StrokesToRainbow, AddiOSToggle("Bordes Rainbow UI", Config.RainbowUI, 10, function(v) Config.RainbowUI = v end))
+table.insert(StrokesToRainbow, AddSkyboxSelector(11))
+table.insert(StrokesToRainbow, AddiOSToggle("FPS Boost by Heaven", Config.FPSBoostEnabled, 12, function(v)
+    ApplyFPSBoostByHeaven(v)
+end))
+
+-- // CÍRCULO FOV SEGURO //
+local FOVCircle = nil
+pcall(function()
+    FOVCircle = Drawing.new("Circle")
+    FOVCircle.Thickness = 2
+    FOVCircle.NumSides = 64
+    FOVCircle.Radius = Config.FOVRadius
+    FOVCircle.Filled = false
+    FOVCircle.Visible = Config.ShowFOV
+    FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+end)
+
+-- // DETECCIÓN DE ROLES //
+local function GetPlayerRole(player)
+    local hasKnife, hasGun = false, false
+
+    local function checkContainer(container)
+        if not container then return end
+        for _, item in ipairs(container:GetChildren()) do
+            if item:IsA("Tool") then
+                local name = string.lower(item.Name)
+                if string.find(name, "knife") or string.find(name, "cuchillo") or string.find(name, "blade") or string.find(name, "dagger") or string.find(name, "sword") then
+                    hasKnife = true
+                elseif string.find(name, "gun") or string.find(name, "revolver") or string.find(name, "pistola") or string.find(name, "sheriff") or string.find(name, "deagle") then
+                    hasGun = true
+                end
+            end
+        end
+    end
+
+    checkContainer(player.Character)
+    checkContainer(player:FindFirstChild("Backpack"))
+
+    if hasKnife then
+        return "KNIFE", Color3.fromRGB(255, 59, 48)
+    elseif hasGun then
+        return "GUN", Color3.fromRGB(0, 122, 255)
+    else
+        return "INOCENTE", Color3.fromRGB(52, 199, 89)
+    end
+end
+
+-- // OBJETIVO EN FOV //
+local function GetClosestTargetInFOV()
+    local closestTarget = nil
+    local shortestDistance = Config.FOVRadius
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local targetPart = player.Character:FindFirstChild(Config.TargetPart) or player.Character:FindFirstChild("Torso") or player.Character:FindFirstChild("UpperTorso")
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+
+            if targetPart and humanoid and humanoid.Health > 0 then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+                    if dist <= shortestDistance then
+                        shortestDistance = dist
+                        closestTarget = targetPart
+                    end
+                end
+            end
+        end
+    end
+    return closestTarget
+end
+
+-- // ESP //
+local ESPObjects = {}
+
+local function RemoveESP(player)
+    if ESPObjects[player] then
+        if ESPObjects[player].Highlight then ESPObjects[player].Highlight:Destroy() end
+        if ESPObjects[player].Billboard then ESPObjects[player].Billboard:Destroy() end
+        ESPObjects[player] = nil
+    end
+end
+
+local function UpdateESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            if Config.ESPEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                local roleText, roleColor = "JUGADOR", Color3.fromRGB(255, 255, 255)
+                if Config.ESPShowRoles then
+                    roleText, roleColor = GetPlayerRole(player)
+                end
+
+                if not ESPObjects[player] then
+                    ESPObjects[player] = {}
+
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "FamilyESP_HL"
+                    hl.FillTransparency = 0.5
+                    hl.OutlineTransparency = 0
+                    hl.Parent = ESPFolder
+                    ESPObjects[player].Highlight = hl
+
+                    local bb = Instance.new("BillboardGui")
+                    bb.Name = "FamilyESP_BB"
+                    bb.Size = UDim2.new(0, 120, 0, 40)
+                    bb.StudsOffset = Vector3.new(0, 3.2, 0)
+                    bb.AlwaysOnTop = true
+                    bb.Parent = ESPFolder
+
+                    local txt = Instance.new("TextLabel")
+                    txt.Size = UDim2.new(1, 0, 1, 0)
+                    txt.BackgroundTransparency = 1
+                    txt.Font = Enum.Font.GothamBold
+                    txt.TextSize = 13
+                    txt.TextStrokeTransparency = 0.3
+                    txt.Parent = bb
+
+                    ESPObjects[player].Billboard = bb
+                    ESPObjects[player].Label = txt
+                end
+
+                local data = ESPObjects[player]
+                data.Highlight.Adornee = player.Character
+                data.Highlight.FillColor = roleColor
+                data.Highlight.OutlineColor = roleColor
+
+                data.Billboard.Adornee = player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart")
+                data.Label.TextColor3 = roleColor
+                data.Label.Text = Config.ESPShowRoles and string.format("%s\n[%s]", player.Name, roleText) or player.Name
+            else
+                RemoveESP(player)
+            end
+        end
+    end
+end
+
+Players.PlayerRemoving:Connect(RemoveESP)
+
+-- // BUCLE PRINCIPAL //
+local hue = 0
+RunService.RenderStepped:Connect(function(dt)
+    hue = (hue + dt * 0.4) % 1
+    local rainbowColor = Color3.fromHSV(hue, 1, 1)
+
+    if Config.RainbowUI then
+        for _, stroke in ipairs(StrokesToRainbow) do
+            if stroke and stroke.Parent then
+                stroke.Color = rainbowColor
+            end
+        end
+    else
+        for _, stroke in ipairs(StrokesToRainbow) do
+            if stroke and stroke.Parent then
+                stroke.Color = Color3.fromRGB(58, 58, 60)
+            end
+        end
+    end
+
+    if FOVCircle then
+        pcall(function()
+            FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            FOVCircle.Radius = Config.FOVRadius
+            FOVCircle.Visible = Config.ShowFOV
+            FOVCircle.Color = Config.RainbowFOV and rainbowColor or Color3.fromRGB(255, 255, 255)
+        end)
+    end
+
+    if Config.CamLockEnabled then
+        local target = GetClosestTargetInFOV()
+        if target then
+            local targetCFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Config.Smoothness)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.25) do
+        if not ScreenGui.Parent then break end
+        UpdateESP()
+    end
+end)
